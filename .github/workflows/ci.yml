@@ -1,4 +1,4 @@
-name: CI with SonarCloud
+name: CI + Deploy to Cloud Run
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  build:
-    name: Build and Analyze
+  build-and-deploy:
+    name: Build, Test, Analyze and Deploy
     runs-on: ubuntu-latest
 
     steps:
@@ -35,3 +35,22 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           projectBaseDir: .
+
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: "${{ secrets.GCP_SA_KEY }}"
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy to Cloud Run
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          gcloud run deploy ${{ secrets.CLOUD_RUN_SERVICE_NAME }} \
+            --source . \
+            --region ${{ secrets.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated
